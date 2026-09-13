@@ -1,12 +1,18 @@
 import telebot
 import os
+import sys
 import time
 import datetime
+import signal
 from threading import Thread
 from flask import Flask
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import pymongo
 from dotenv import load_dotenv
+
+# Logların Render konsolunda anında görünmesi için unbuffered output
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
 
 # .env dosyasını yükle (varsa)
 load_dotenv()
@@ -456,7 +462,19 @@ def home():
 
 def run():
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
+
+def shutdown_handler(signum, frame):
+    print("Kapatma sinyali alındı (SIGTERM/SIGINT). Polling durduruluyor...")
+    if bot:
+        try:
+            bot.stop_polling()
+        except Exception:
+            pass
+    os._exit(0)
+
+signal.signal(signal.SIGTERM, shutdown_handler)
+signal.signal(signal.SIGINT, shutdown_handler)
 
 if __name__ == "__main__":
     # Render / UptimeRobot için Web Server
@@ -477,7 +495,7 @@ if __name__ == "__main__":
             try:
                 bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
             except Exception as e:
-                print(f"Polling bağlantı hatası veya çakışma: {e}. 5 saniye içinde yeniden bağlanılıyor...")
+                print(f"Polling bağlantı uyarısı: {e}. 5 saniye içinde yeniden bağlanılıyor...")
                 time.sleep(5)
     else:
         print("Bot başlatılamadı: BOT_TOKEN eksik.")
