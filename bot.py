@@ -60,7 +60,7 @@ def kullanici_kaydet(user_id):
     try:
         uid = int(user_id)
         if uid > 0:
-            users_col.update_one({"user_id": uid}, {"$set": {"user_id": uid, "last_active": datetime.datetime.utcnow()}}, upsert=True)
+            users_col.update_one({"user_id": uid}, {"$set": {"user_id": uid, "last_active": datetime.datetime.now(datetime.timezone.utc)}}, upsert=True)
     except Exception as e:
         print(f"Kullanıcı kaydetme hatası: {e}")
 
@@ -123,7 +123,7 @@ def send_welcome(message):
     kullanici_kaydet(message.from_user.id)
     user_id = message.from_user.id
 
-    if bans_col and bans_col.find_one({"user_id": user_id}):
+    if bans_col is not None and bans_col.find_one({"user_id": user_id}):
         try:
             bot.reply_to(message, "🚫 Bot kullanımınız engellenmiştir.")
         except:
@@ -182,7 +182,7 @@ def unban_user(message):
         return
     try:
         user_id = int(parts[1])
-        if bans_col:
+        if bans_col is not None:
             sonuc = bans_col.delete_one({"user_id": user_id})
             if sonuc.deleted_count > 0:
                 bot.reply_to(message, f"✅ <b>{user_id}</b> ID'li kullanıcının yasağı kaldırıldı.", parse_mode="HTML")
@@ -197,8 +197,8 @@ def unban_user(message):
 def bot_stats(message):
     if message.chat.id != ADMIN_GROUP_ID and message.from_user.id != PATRON_ID:
         return
-    user_count = users_col.count_documents({}) if users_col else 0
-    ban_count = bans_col.count_documents({}) if bans_col else 0
+    user_count = users_col.count_documents({}) if users_col is not None else 0
+    ban_count = bans_col.count_documents({}) if bans_col is not None else 0
     text = (
         f"📊 <b>Bot İstatistikleri</b>\n\n"
         f"👥 Kayıtlı Kullanıcı Sayısı: <code>{user_count}</code>\n"
@@ -242,7 +242,7 @@ def handle_user_submission(message):
         return
 
     # Ban kontrolü
-    if bans_col and bans_col.find_one({"user_id": user_id}):
+    if bans_col is not None and bans_col.find_one({"user_id": user_id}):
         try:
             bot.reply_to(message, "🚫 Bot kullanımınız yasaklanmıştır.")
         except:
@@ -430,8 +430,8 @@ def handle_admin_action(call):
             bot.answer_callback_query(call.id, "Patron banlanamaz!", show_alert=True)
             return
 
-        if bans_col:
-            bans_col.update_one({"user_id": user_id}, {"$set": {"user_id": user_id, "banned_at": datetime.datetime.utcnow()}}, upsert=True)
+        if bans_col is not None:
+            bans_col.update_one({"user_id": user_id}, {"$set": {"user_id": user_id, "banned_at": datetime.datetime.now(datetime.timezone.utc)}}, upsert=True)
 
         new_admin_text = f"🚫 {admin_etiket} Tarafından BANLANDI (Kullanıcı Yasaklandı)\n\n{full_caption}"
         if len(new_admin_text) > 1024:
