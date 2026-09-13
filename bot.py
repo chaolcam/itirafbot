@@ -358,12 +358,24 @@ def handle_admin_action(call):
     
     # Kanalda yayınlanacak metni hazırla (Admin başlığını ayıkla)
     channel_raw = ""
-    if "📝 <b>İtiraf:</b>\n" in full_caption:
-        channel_raw = full_caption.split("📝 <b>İtiraf:</b>\n", 1)[1].strip()
-    elif "(Metin/Açıklama girilmedi)" not in full_caption and "📝 <b>İtiraf:</b>" in full_caption:
-        channel_raw = full_caption.split("📝 <b>İtiraf:</b>", 1)[1].strip()
-    elif "📝 <b>İçerik/Açıklama:</b>\n" in full_caption:
-        channel_raw = full_caption.split("📝 <b>İçerik/Açıklama:</b>\n", 1)[1].strip()
+    split_keys = [
+        "📝 İtiraf:\n",
+        "📝 <b>İtiraf:</b>\n",
+        "📝 İtiraf:",
+        "📝 <b>İtiraf:</b>",
+        "İtiraf:\n",
+        "📝 İçerik/Açıklama:\n",
+        "📝 <b>İçerik/Açıklama:</b>\n",
+        "📝 İçerik/Açıklama:",
+        "İçerik/Açıklama:\n"
+    ]
+    for key in split_keys:
+        if key in full_caption:
+            channel_raw = full_caption.split(key, 1)[1].strip()
+            break
+
+    if channel_raw in ["(Metin/Açıklama girilmedi)", "(Açıklama girilmedi)", "(Metin yok)", ""]:
+        channel_raw = ""
 
     # Botun kullanıcı adını al
     bot_uname = get_bot_username()
@@ -385,19 +397,28 @@ def handle_admin_action(call):
         try:
             sent_channel_msg = None
             if admin_msg.content_type == 'photo':
-                sent_channel_msg = bot.send_photo(TARGET_CHANNEL_ID, admin_msg.photo[-1].file_id, caption=channel_text, parse_mode='HTML')
+                try:
+                    sent_channel_msg = bot.send_photo(TARGET_CHANNEL_ID, admin_msg.photo[-1].file_id, caption=channel_text, parse_mode='HTML')
+                except Exception:
+                    sent_channel_msg = bot.send_photo(TARGET_CHANNEL_ID, admin_msg.photo[-1].file_id, caption=channel_text)
                 if BACKUP_CHANNEL_ID:
-                    try: bot.send_photo(BACKUP_CHANNEL_ID, admin_msg.photo[-1].file_id, caption=channel_text, parse_mode='HTML')
+                    try: bot.send_photo(BACKUP_CHANNEL_ID, admin_msg.photo[-1].file_id, caption=channel_text)
                     except: pass
             elif admin_msg.content_type == 'video':
-                sent_channel_msg = bot.send_video(TARGET_CHANNEL_ID, admin_msg.video.file_id, caption=channel_text, parse_mode='HTML')
+                try:
+                    sent_channel_msg = bot.send_video(TARGET_CHANNEL_ID, admin_msg.video.file_id, caption=channel_text, parse_mode='HTML')
+                except Exception:
+                    sent_channel_msg = bot.send_video(TARGET_CHANNEL_ID, admin_msg.video.file_id, caption=channel_text)
                 if BACKUP_CHANNEL_ID:
-                    try: bot.send_video(BACKUP_CHANNEL_ID, admin_msg.video.file_id, caption=channel_text, parse_mode='HTML')
+                    try: bot.send_video(BACKUP_CHANNEL_ID, admin_msg.video.file_id, caption=channel_text)
                     except: pass
             elif admin_msg.content_type == 'text':
-                sent_channel_msg = bot.send_message(TARGET_CHANNEL_ID, text=channel_text, parse_mode='HTML')
+                try:
+                    sent_channel_msg = bot.send_message(TARGET_CHANNEL_ID, text=channel_text, parse_mode='HTML')
+                except Exception:
+                    sent_channel_msg = bot.send_message(TARGET_CHANNEL_ID, text=channel_text)
                 if BACKUP_CHANNEL_ID:
-                    try: bot.send_message(BACKUP_CHANNEL_ID, text=channel_text, parse_mode='HTML')
+                    try: bot.send_message(BACKUP_CHANNEL_ID, text=channel_text)
                     except: pass
             elif admin_msg.content_type == 'document':
                 sent_channel_msg = bot.send_document(TARGET_CHANNEL_ID, admin_msg.document.file_id, caption=channel_text, parse_mode='HTML')
