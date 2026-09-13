@@ -464,7 +464,20 @@ if __name__ == "__main__":
     print("Web sunucusu arka planda başlatıldı.")
 
     if bot:
+        # Varsa eski webhook'u sil ve bekleyen eski güncellemeleri temizle
+        try:
+            bot.delete_webhook(drop_pending_updates=True)
+            time.sleep(1)
+            print("Webhook temizlendi, polling moduna geçildi.")
+        except Exception as e:
+            print(f"Webhook temizleme uyarısı: {e}")
+
         print("Bot dinlemeye başladı (infinity_polling)...")
-        bot.infinity_polling()
+        while True:
+            try:
+                bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
+            except Exception as e:
+                print(f"Polling bağlantı hatası veya çakışma: {e}. 5 saniye içinde yeniden bağlanılıyor...")
+                time.sleep(5)
     else:
         print("Bot başlatılamadı: BOT_TOKEN eksik.")
