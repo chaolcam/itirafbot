@@ -35,6 +35,18 @@ if not TOKEN:
 
 bot = telebot.TeleBot(TOKEN) if TOKEN else None
 
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "").replace("@", "")
+
+def get_bot_username():
+    global BOT_USERNAME
+    if not BOT_USERNAME and bot:
+        try:
+            me = bot.get_me()
+            BOT_USERNAME = me.username
+        except Exception:
+            pass
+    return BOT_USERNAME or ""
+
 # --- MONGODB BAĞLANTISI ---
 users_col = None
 bans_col = None
@@ -131,15 +143,16 @@ def send_welcome(message):
         return
 
     welcome_text = (
-        "👋 <b>Hoş Geldiniz!</b>\n\n"
-        "Bu bot üzerinden kanalımızda paylaşılmasını istediğiniz <b>metin, fotoğraf veya videoları</b> gönderebilirsiniz.\n\n"
-        "📩 Gönderiniz yöneticilerimiz tarafından incelenecek ve onaylandığında doğrudan kanalımızda yayınlanacaktır.\n\n"
-        "⚠️ <b>Not:</b> Gönderi yapabilmek için resmi kanalımıza katılmış olmanız gerekmektedir."
+        "🤫 <b>Anonim İtiraf Botuna Hoş Geldiniz!</b>\n\n"
+        "İçinizde tutamadığınız, kimseyle paylaşamadığınız her şeyi buraya özgürce yazabilir, fotoğraf veya video gönderebilirsiniz.\n\n"
+        "🔒 <b>Tamamen Anonim:</b> Gönderdiğiniz itiraflar kanalımızda <b>isminiz, kullanıcı adınız veya profiliniz kesinlikle görünmeden</b> tamamen anonim olarak paylaşılır.\n\n"
+        "📩 İtirafınız yöneticilerimiz tarafından incelendikten sonra onaylanırsa resmi kanalımızda yayınlanır.\n\n"
+        "⚠️ <b>Kural:</b> İtiraf gönderebilmek için resmi kanalımıza katılmış olmanız gerekmektedir."
     )
     
     # Kanal üyeliği kontrolü
     if not check_user_membership(user_id):
-        welcome_text += "\n\n❗ <b>Lütfen önce aşağıdaki kanala katılın:</b>"
+        welcome_text += "\n\n❗ <b>İtiraf gönderebilmek için lütfen önce aşağıdaki kanala katılın:</b>"
         try:
             bot.reply_to(message, welcome_text, parse_mode="HTML", reply_markup=get_channel_join_markup())
         except:
@@ -200,7 +213,7 @@ def bot_stats(message):
     user_count = users_col.count_documents({}) if users_col is not None else 0
     ban_count = bans_col.count_documents({}) if bans_col is not None else 0
     text = (
-        f"📊 <b>Bot İstatistikleri</b>\n\n"
+        f"📊 <b>İtiraf Botu İstatistikleri</b>\n\n"
         f"👥 Kayıtlı Kullanıcı Sayısı: <code>{user_count}</code>\n"
         f"🚫 Yasaklı Kullanıcı Sayısı: <code>{ban_count}</code>"
     )
@@ -221,8 +234,8 @@ def handle_channel_join_check(call):
                 message_id=call.message.message_id,
                 text=(
                     "✅ <b>Katılımınız Onaylandı!</b>\n\n"
-                    "Artık kanalımızda paylaşılmasını istediğiniz <b>metin, fotoğraf veya videoları</b> doğrudan buraya gönderebilirsiniz. "
-                    "Yöneticilerimiz onayladıktan sonra kanalımızda paylaşılacaktır."
+                    "Artık kanalımızda anonim olarak paylaşılmasını istediğiniz <b>itirafınızı (metin, fotoğraf veya video)</b> doğrudan buraya gönderebilirsiniz 🤫\n\n"
+                    "Yöneticilerimiz inceleyip onayladıktan sonra kanalımızda <b>kimliğiniz gizli tutularak</b> paylaşılacaktır."
                 ),
                 parse_mode="HTML"
             )
@@ -252,8 +265,8 @@ def handle_user_submission(message):
     # Kanal Üyelik Kontrolü
     if not check_user_membership(user_id):
         warning_text = (
-            "📢 <b>Gönderi Yapabilmek İçin Kanala Katılmalısınız!</b>\n\n"
-            "İçeriğinizin incelenmesi ve kanalda paylaşılabilmesi için resmi kanalımıza katılmanız gerekmektedir.\n\n"
+            "📢 <b>İtiraf Gönderebilmek İçin Kanala Katılmalısınız!</b>\n\n"
+            "İtirafınızın incelenmesi ve kanalımızda anonim olarak paylaşılabilmesi için resmi kanalımıza katılmanız gerekmektedir.\n\n"
             "Aşağıdaki butondan kanala katıldıktan sonra <b>'✅ Katıldım / Kontrol Et'</b> butonuna basınız."
         )
         try:
@@ -287,11 +300,11 @@ def handle_user_submission(message):
     markup.add(btn_approve, btn_reject)
     markup.add(btn_ban)
 
-    admin_header = f"👤 <b>Gönderen:</b> {user_link} (ID: <code>{user_id}</code>)\n"
+    admin_header = f"🤫 <b>YENİ İTİRAF GELDİ!</b>\n\n👤 <b>Gönderen:</b> {user_link} (ID: <code>{user_id}</code>)\n"
     if content_caption:
-        admin_header += f"\n📝 <b>İçerik/Açıklama:</b>\n{content_caption}"
+        admin_header += f"\n📝 <b>İtiraf:</b>\n{content_caption}"
     else:
-        admin_header += "\n<i>(Açıklama girilmedi)</i>"
+        admin_header += "\n<i>(Metin/Açıklama girilmedi)</i>"
 
     try:
         if message.content_type == 'photo':
@@ -305,10 +318,10 @@ def handle_user_submission(message):
         elif message.content_type == 'voice':
             bot.send_voice(ADMIN_GROUP_ID, message.voice.file_id, caption=admin_header, reply_markup=markup, parse_mode='HTML')
 
-        bot.reply_to(message, "✅ <b>Gönderiniz alındı!</b>\n\nYöneticilerimiz tarafından incelendikten sonra uygun görülürse kanalda paylaşılacaktır.", parse_mode="HTML")
+        bot.reply_to(message, "🤫 <b>İtirafınız alındı!</b>\n\nYöneticilerimiz tarafından incelendikten sonra uygun görülürse kanalımızda <b>tamamen anonim</b> olarak paylaşılacaktır.", parse_mode="HTML")
     except Exception as e:
         print(f"Onay grubuna iletme hatası: {e}")
-        bot.reply_to(message, "⚠️ Gönderiniz iletilirken bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.")
+        bot.reply_to(message, "⚠️ İtirafınız iletilirken bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.")
 
 # --- YÖNETİCİ ONAY / RED / BAN İŞLEYİCİSİ ---
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("app_", "rej_", "ban_")))
@@ -329,11 +342,29 @@ def handle_admin_action(call):
     full_caption = admin_msg.caption if admin_msg.caption else (admin_msg.text if admin_msg.text else "")
     
     # Kanalda yayınlanacak metni hazırla (Admin başlığını ayıkla)
-    channel_text = ""
-    if "📝 <b>İçerik/Açıklama:</b>\n" in full_caption:
-        channel_text = full_caption.split("📝 <b>İçerik/Açıklama:</b>\n", 1)[1].strip()
-    elif "(Açıklama girilmedi)" not in full_caption and "📝 <b>İçerik/Açıklama:</b>" in full_caption:
-        channel_text = full_caption.split("📝 <b>İçerik/Açıklama:</b>", 1)[1].strip()
+    channel_raw = ""
+    if "📝 <b>İtiraf:</b>\n" in full_caption:
+        channel_raw = full_caption.split("📝 <b>İtiraf:</b>\n", 1)[1].strip()
+    elif "(Metin/Açıklama girilmedi)" not in full_caption and "📝 <b>İtiraf:</b>" in full_caption:
+        channel_raw = full_caption.split("📝 <b>İtiraf:</b>", 1)[1].strip()
+    elif "📝 <b>İçerik/Açıklama:</b>\n" in full_caption:
+        channel_raw = full_caption.split("📝 <b>İçerik/Açıklama:</b>\n", 1)[1].strip()
+
+    # Botun kullanıcı adını al
+    bot_uname = get_bot_username()
+    bot_tag = f"@{bot_uname}" if bot_uname else ""
+
+    # Şık ve modern ayırıcı formatı: İtiraf + Estetik Çizgi + İtiraf için @bot_adi
+    footer = "✦ ────────────────────── ✦\n"
+    if bot_tag:
+        footer += f"🤫 <b>İtiraf için:</b> {bot_tag}"
+    else:
+        footer += "🤫 <b>İtiraf göndermek için bota yazabilirsiniz.</b>"
+
+    if channel_raw:
+        channel_text = f"{channel_raw}\n\n{footer}"
+    else:
+        channel_text = footer
 
     if action == "app":
         try:
@@ -349,9 +380,9 @@ def handle_admin_action(call):
                     try: bot.send_video(BACKUP_CHANNEL_ID, admin_msg.video.file_id, caption=channel_text, parse_mode='HTML')
                     except: pass
             elif admin_msg.content_type == 'text':
-                sent_channel_msg = bot.send_message(TARGET_CHANNEL_ID, text=channel_text if channel_text else full_caption, parse_mode='HTML')
+                sent_channel_msg = bot.send_message(TARGET_CHANNEL_ID, text=channel_text, parse_mode='HTML')
                 if BACKUP_CHANNEL_ID:
-                    try: bot.send_message(BACKUP_CHANNEL_ID, text=channel_text if channel_text else full_caption, parse_mode='HTML')
+                    try: bot.send_message(BACKUP_CHANNEL_ID, text=channel_text, parse_mode='HTML')
                     except: pass
             elif admin_msg.content_type == 'document':
                 sent_channel_msg = bot.send_document(TARGET_CHANNEL_ID, admin_msg.document.file_id, caption=channel_text, parse_mode='HTML')
@@ -382,9 +413,9 @@ def handle_admin_action(call):
 
             # Kullanıcıya bildirim gönder
             try:
-                notify_text = "🎉 <b>Gönderiniz onaylandı ve kanalımızda paylaşıldı!</b>"
+                notify_text = "🎉 <b>İtirafınız onaylandı ve kanalımızda anonim olarak paylaşıldı!</b>"
                 if post_link:
-                    notify_text += f"\n\n🔗 <b>Gönderiye Git:</b> {post_link}"
+                    notify_text += f"\n\n🔗 <b>İtirafı Görüntüle:</b> {post_link}"
                 if orig_msg_id:
                     bot.send_message(user_id, notify_text, reply_to_message_id=orig_msg_id, parse_mode="HTML")
                 else:
@@ -392,7 +423,7 @@ def handle_admin_action(call):
             except Exception as notify_err:
                 print(f"Kullanıcıya bildirim gönderilemedi: {notify_err}")
 
-            bot.answer_callback_query(call.id, "İçerik onaylandı ve kanalda paylaşıldı!")
+            bot.answer_callback_query(call.id, "İtiraf onaylandı ve kanalda paylaşıldı!")
         except Exception as e:
             print(f"Onaylama hatası: {e}")
             bot.answer_callback_query(call.id, f"Hata: {str(e)[:50]}")
@@ -413,7 +444,7 @@ def handle_admin_action(call):
                 except: pass
 
             try:
-                reject_text = "❌ Maalesef gönderdiğiniz içerik yöneticiler tarafından uygun görülmedi ve reddedildi."
+                reject_text = "❌ Gönderdiğiniz itiraf yöneticilerimiz tarafından uygun görülmediği için reddedildi."
                 if orig_msg_id:
                     bot.send_message(user_id, reject_text, reply_to_message_id=orig_msg_id)
                 else:
@@ -421,7 +452,7 @@ def handle_admin_action(call):
             except:
                 pass
 
-            bot.answer_callback_query(call.id, "İçerik reddedildi.")
+            bot.answer_callback_query(call.id, "İtiraf reddedildi.")
         except Exception as e:
             bot.answer_callback_query(call.id, f"Hata: {str(e)[:50]}")
 
@@ -458,7 +489,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Kanal Onay & Paylaşım Botu Aktif ve Çalışıyor! (Render / UptimeRobot)"
+    return "Anonim İtiraf Botu Aktif ve Çalışıyor! (Render / UptimeRobot)"
 
 def run():
     port = int(os.environ.get("PORT", 8080))
