@@ -21,12 +21,31 @@ load_dotenv()
 TOKEN = os.environ.get("BOT_TOKEN")
 MONGO_URI = os.environ.get("MONGO_URI")
 
-ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1003791676374"))
-TARGET_CHANNEL_ID = int(os.environ.get("TARGET_CHANNEL_ID", "-1003983042944"))
-CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "resimpuanla").replace("@", "")
-CHANNEL_INVITE_LINK = os.environ.get("CHANNEL_INVITE_LINK", "")
+def normalize_chat_id(val, default=None):
+    """Telegram kanal/grup ID'lerini otomatik olarak -100 önekine uyarlar."""
+    if val is None or str(val).strip() == "":
+        return default
+    s = str(val).strip()
+    if s.startswith("-100"):
+        return int(s)
+    elif s.startswith("-"):
+        return int(s)
+    else:
+        return int("-100" + s)
+
+# Katılımı Zorunlu Kanal (anonimdunyasi)
+FORCE_CHANNEL_ID = normalize_chat_id(os.environ.get("FORCE_CHANNEL_ID"), default=-1004437943254)
+CHANNEL_INVITE_LINK = os.environ.get("CHANNEL_INVITE_LINK", "https://t.me/anonimdunyasi")
+
+# İtirafların Paylaşılacağı Kanal
+TARGET_CHANNEL_ID = normalize_chat_id(os.environ.get("TARGET_CHANNEL_ID"), default=-1004319960957)
+CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "").replace("@", "")
+
+# Yönetici Onay Grubu
+ADMIN_GROUP_ID = normalize_chat_id(os.environ.get("ADMIN_GROUP_ID"), default=-1003737616501)
+
 BACKUP_CHANNEL_ID_ENV = os.environ.get("BACKUP_CHANNEL_ID", "")
-BACKUP_CHANNEL_ID = int(BACKUP_CHANNEL_ID_ENV) if BACKUP_CHANNEL_ID_ENV else None
+BACKUP_CHANNEL_ID = normalize_chat_id(BACKUP_CHANNEL_ID_ENV) if BACKUP_CHANNEL_ID_ENV else None
 
 PATRON_ID = int(os.environ.get("PATRON_ID", "7075582251"))
 
@@ -78,29 +97,25 @@ def kullanici_kaydet(user_id):
 
 # --- KANAL ÜYELİK KONTROLÜ (FORCE CHANNEL JOIN) ---
 def check_user_membership(user_id):
-    """Kullanıcının TARGET_CHANNEL_ID kanalına katılıp katılmadığını kontrol eder."""
-    if not TARGET_CHANNEL_ID or not bot:
-        return True
-    if user_id == PATRON_ID:
+    """Kullanıcının FORCE_CHANNEL_ID kanalına katılıp katılmadığını kontrol eder."""
+    if not FORCE_CHANNEL_ID or not bot:
         return True
     try:
-        member = bot.get_chat_member(chat_id=TARGET_CHANNEL_ID, user_id=user_id)
+        member = bot.get_chat_member(chat_id=FORCE_CHANNEL_ID, user_id=user_id)
+        print(f"DEBUG: Kullanıcı {user_id} - Kanal {FORCE_CHANNEL_ID} üyelik durumu: {member.status}")
         # creator, administrator, member, restricted durumları onaylı kabul edilir
         if member.status in ['creator', 'administrator', 'member', 'restricted']:
             return True
         return False
     except Exception as e:
-        print(f"Kanal üyelik kontrolü uyarısı: {e}")
-        # Bot kanalda yönetici değilse veya API geçici hata verirse
+        print(f"Kanal üyelik kontrolü hatası (Kanal ID: {FORCE_CHANNEL_ID}, Kullanıcı: {user_id}): {e}")
+        # Hata durumunda (veya üye değilse) şartın çıkması için False dön
         return False
 
 def get_channel_join_markup():
     markup = InlineKeyboardMarkup()
     if CHANNEL_INVITE_LINK:
         btn_join = InlineKeyboardButton("📢 Kanala Katıl", url=CHANNEL_INVITE_LINK)
-        markup.add(btn_join)
-    elif CHANNEL_USERNAME:
-        btn_join = InlineKeyboardButton("📢 Kanala Katıl", url=f"https://t.me/{CHANNEL_USERNAME}")
         markup.add(btn_join)
     btn_check = InlineKeyboardButton("✅ Katıldım / Kontrol Et", callback_data="check_channel_join")
     markup.add(btn_check)
